@@ -11,6 +11,6 @@ typedef struct
 } image_t;
 
 int extract_images_djv(const char* file, int page_count, image_t* ibuff);
-// int extract_images_pdf(const char* file, int page_count, image_t* ibuff);
+int extract_images_pdf(const char* file, int page_count, image_t* ibuff);
 
 #endif
