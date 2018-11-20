@@ -5,7 +5,7 @@
 int extract_images_djv(const char* file, int page_count, image_t* ibuff)
 {
 	ddjvu_context_t* ctx = ddjvu_context_create("djv ctx");
-	if(!ctx || !ibuff)
+	if(!ctx || !ibuff) /* EFAULT? */
 		return -1;
 
 	ddjvu_document_t* doc = ddjvu_document_create_by_filename(ctx, file, 0);
@@ -13,6 +13,16 @@ int extract_images_djv(const char* file, int page_count, image_t* ibuff)
 	{
 		ddjvu_context_release(ctx);
 		return -2;
+	}
+
+	while(!ddjvu_document_decoding_done(doc))
+		continue;
+
+	if(page_count < 0 || page_count >= ddjvu_document_get_pagenum(doc)) /* EINVAL? */
+	{
+		ddjvu_document_release(doc);
+		ddjvu_context_release(ctx);
+		return -3;
 	}
 
 	static unsigned int masks[4] = { 0xff0000, 0xff00, 0xff, 0xff000000 };
@@ -23,6 +33,8 @@ int extract_images_djv(const char* file, int page_count, image_t* ibuff)
 	while(page_read != page_count)
 	{
 		ddjvu_page_t* page = ddjvu_page_create_by_pageno(doc, page_read);
+		if(!page)
+			break;
 
 		while(!ddjvu_page_decoding_done(page))
 			continue;

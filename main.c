@@ -136,11 +136,26 @@ int main(int argc, char* argv[])
 			goto exit;
 		}
 	}
-	if(!file && optind + 1 == argc)
-		file = argv[optind];
+	if(!file)
+	{
+		if(optind + 1 == argc)
+			file = argv[optind];
+		else
+		{
+			fprintf(stderr, "No file passed\n");
+			retcode = EXIT_FAILURE;
+			goto exit;
+		}
+	}
+
+	extract_func process = NULL;
+	if(!strcasecmp(type, "djv") || !strcasecmp(type, "djvu"))
+		process = &extract_images_djv;
+	else if(!strcasecmp(type, "pdf"))
+		process = &extract_images_pdf;
 	else
 	{
-		print_err("%s!\n", "No file passed");
+		fprintf(stderr, "Unsupported filetype\n");
 		retcode = EXIT_FAILURE;
 		goto exit;
 	}
@@ -155,18 +170,24 @@ int main(int argc, char* argv[])
 	}
 
 	image_t* images = calloc(page_count, sizeof(image_t));
-	if(extract_images_djv(file, page_count, images) <= 0)
+	if(!images)
 	{
-		fprintf(stderr, "Failed processing file\n");
+		perror("Failed allocation");
+		retcode = EXIT_FAILURE;
+		goto clean_ocr;
+	}
+	if(process(file, page_count, images) != page_count)
+	{
+		perror("Failed processing file");
 		retcode = EXIT_FAILURE;
 		goto clean_mem;
 	}
 
 #ifdef DEBUG
 	for(int i = 0; i < page_count; i++)
-		print_log("%s: page #%d: %dx%d, %d kB\n", __FUNCTION__,
-		          i, images[i].width, images[i].height,
-		          images[i].bytes_per_line * images[i].height / 1024);
+		print_log("page[%d]: %dx%d, %d kB\n", i,
+		          images[i].width, images[i].height,
+		          images[i].bytes_per_pixel * images[i].width * images[i].height / 1024);
 #endif
 
 	regcomp(&isbn_rx, isbn_rx_str, REG_ICASE);

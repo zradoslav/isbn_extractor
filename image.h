@@ -10,6 +10,8 @@ typedef struct
 	unsigned char* data;
 } image_t;
 
+typedef int (*extract_func)(const char*, int, image_t*);
+
 int extract_images_djv(const char* file, int page_count, image_t* ibuff);
 int extract_images_pdf(const char* file, int page_count, image_t* ibuff);
 
