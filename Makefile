@@ -1,16 +1,16 @@
-SOURCES = $(wildcard *.c)
-OBJECTS = $(SOURCES:.c=.o)
-DEPENDS = $(OBJECTS:.o=.d)
+SOURCES = $(wildcard *.cpp)
+OBJECTS = $(SOURCES:%.cpp=%.o)
+DEPENDS = $(OBJECTS:%.o=%.d)
 
-CFLAGS  = -Wall -Wextra -pedantic -O2 -s
-LDFLAGS = -lpcre2-posix -ltesseract -ldjvulibre -l:libmupdf.a -l:libmupdf-third.a \
+CXXFLAGS  = -Wall -Wextra -pedantic -O2 -s -fno-rtti -fno-exceptions
+LDFLAGS = -ltesseract -ldjvulibre -l:libmupdf.a -l:libmupdf-third.a \
           -ljbig2dec -ljpeg -lopenjp2 -lfreetype -lharfbuzz -lm -lz
 
-%.o: %.c
-	$(CC) $(CFLAGS) -o $@ -c $<
+%.o: %.cpp
+	$(CXX) $(CXXFLAGS) -o $@ -c $<
 
 isbn_extract: $(OBJECTS)
-	$(CC) -o $@ $^ $(LDFLAGS)
+	$(CXX) -o $@ $^ $(LDFLAGS)
 
 .PHONY: clean
 clean:
