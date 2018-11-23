@@ -1,6 +1,3 @@
-#ifdef DEBUG
-#include "debug.h"
-#endif
 #include "image.h"
 
 #include <stdlib.h>
@@ -10,13 +7,14 @@
 #include <pcre2posix.h>
 #include <tesseract/capi.h>
 
-static TessBaseAPI* api;
-
-static const char* isbn_rx_str = "isbn[-\\s]*?(1[03])?[:\\s]*([-\\d\\s]+[x\\d])";
+#define isbn_max_num 4
+static const char* isbn_rx_str = "isbn[- \\t]*?(1[03])?[: \\t]*([- \\d\\t]+[x\\d])";
 static regex_t isbn_rx;
 
+static TessBaseAPI* api;
+
 // later i'll add per-format embedded text extraction (if any)
-char* extract_text_ocr(const image_t image, char* tbuff, size_t tbuff_size)
+static char* extract_text_ocr(const image_t image, int* tbuff_size)
 {
 	TessBaseAPISetImage(api, image.data, image.width, image.height, image.bytes_per_pixel, image.bytes_per_line);
 	if(TessBaseAPIRecognize(api, NULL))
@@ -26,29 +24,25 @@ char* extract_text_ocr(const image_t image, char* tbuff, size_t tbuff_size)
 	if(!text)
 		return NULL;
 
-#ifdef DEBUG
-	size_t text_len = strlen(text);
-	if(tbuff_size < text_len)
-		print_err("%s: insufficient storage: %zu < %zu\n", __func__, tbuff_size, text_len);
-#endif
+	char* tbuff = strdup(text);
+	*tbuff_size = strlen(text) + 1;
 
-	strncpy(tbuff, text, tbuff_size);
 	TessDeleteText(text);
 
 	return tbuff;
 }
 
-void match_isbn(const char* text)
+static void match_isbn(const char* text, char** mbuff, int mbuff_len)
 {
 	const char* cursor = text;
 
 	int max_groups = isbn_rx.re_nsub + 1;
 	regmatch_t* groups = malloc(max_groups * sizeof(regmatch_t));
 
-	int matches = 0;
+	int match_num = 0;
 	while(true)
 	{
-		if(regexec(&isbn_rx, cursor, max_groups, groups, 0))
+		if(regexec(&isbn_rx, cursor, max_groups, groups, 0) || match_num == mbuff_len)
 			break;
 
 		int offset = 0;
@@ -60,22 +54,16 @@ void match_isbn(const char* text)
 
 			// group 0 indicates whole match
 			if(i == 0)
+			{
 				offset = groups[i].rm_eo;
+				continue;
+			}
 
-#ifdef DEBUG
 			int match_len = groups[i].rm_eo - groups[i].rm_so;
-			char* match_str = malloc(match_len + 1);
-			strncpy(match_str, cursor + groups[i].rm_so, match_len);
-			match_str[match_len] = '\0';
-
-			print_log("%s: match %u, group %u: [%u-%u]: %s\n", __func__,
-			          matches, i, groups[i].rm_so, groups[i].rm_eo, match_str);
-
-			free(match_str);
-#endif
+			mbuff[match_num] = strndup(cursor + groups[i].rm_so, match_len);
 		}
 		cursor += offset;
-		matches++;
+		match_num++;
 	}
 
 	free(groups);
@@ -86,12 +74,13 @@ static const char* opt_desc[] = {
     ['n'] = "a number of pages to process",
     ['f'] = "document filename",
     ['l'] = "document language in ISO 639-3 (default: eng)",
+    ['v'] = "be verbose",
     ['h'] = "print this help"
 };
 
 static void help()
 {
-	const char* opts = "tnflh";
+	const char* opts = "tnflhv";
 	printf("\n");
 	for(int i = 0; i < strlen(opts); i++)
 		printf(" -%c\t%s\n", opts[i], opt_desc[opts[i]]);
@@ -106,10 +95,11 @@ int main(int argc, char* argv[])
 	const char* file = 0;
 	const char* lang = "eng";
 	int page_count = 0;
+	bool verbose = false;
 
 	/* process command line */
 	int option;
-	while((option = getopt(argc, argv,"f:n:t:l:h")) != -1)
+	while((option = getopt(argc, argv,"f:n:t:l:hv")) != -1)
 	{
 		switch(option)
 		{
@@ -126,13 +116,16 @@ int main(int argc, char* argv[])
 		case 'l':
 			lang = optarg;
 			break;
+		case 'v':
+			verbose = true;
+			break;
 		case 'h':
-			printf("Usage: %s -t type -n pages [-l lang] [-f] file\n", argv[0]);
+			printf("Usage: %s [-v] -t type -n pages [-l lang] [-f] file\n", argv[0]);
 			help();
 			retcode = EXIT_SUCCESS;
 			goto exit;
 		default:
-			printf("Usage: %s -t type -n pages [-l lang] [-f] file\n", argv[0]);
+			printf("Usage: %s [-v] -t type -n pages [-l lang] [-f] file\n", argv[0]);
 			retcode = EXIT_FAILURE;
 			goto exit;
 		}
@@ -190,20 +183,26 @@ int main(int argc, char* argv[])
 		goto clean_mem;
 	}
 
-#ifdef DEBUG
-	for(int i = 0; i < page_count; i++)
-		print_log("page[%d]: %dx%d, %d kB\n", i,
-		          images[i].width, images[i].height,
-		          images[i].bytes_per_pixel * images[i].width * images[i].height / 1024);
-#endif
-
 	regcomp(&isbn_rx, isbn_rx_str, REG_ICASE);
 	for(int i = 0; i < page_count; i++)
 	{
-		char text[2048] = { 0 };
-		extract_text_ocr(images[i], text, sizeof(text));
+		if(verbose)
+			printf("page[%d]: %dx%d, %d kB\n", i, images[i].width, images[i].height,
+			       images[i].bytes_per_pixel * images[i].width * images[i].height / 1024);
 
-		match_isbn(text);
+		int ocr_len = 0;
+		char* ocr_text = extract_text_ocr(images[i], &ocr_len);
+
+		char* matches[isbn_max_num] = { 0 };
+		match_isbn(ocr_text, matches, isbn_max_num);
+		for(int i = 0; i < isbn_max_num; i++)
+			if(matches[i])
+			{
+				printf("%s\n", matches[i]);
+				free(matches[i]);
+			}
+
+		free(ocr_text);
 	}
 	regfree(&isbn_rx);
 

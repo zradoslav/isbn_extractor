@@ -31,6 +31,7 @@ int extract_images_pdf(const char* file, int page_count, image_t* ibuff)
 	int page_read = 0;
 	while(page_read != page_count)
 	{
+		/* 'fz_device_gray' can be used to reduce mem by 3 */
 		fz_pixmap* pix = fz_new_pixmap_from_page_number(ctx, doc, page_read, ctm, fz_device_rgb(ctx), 0);
 		if(!pix)
 			break;
