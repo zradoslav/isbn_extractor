@@ -1,0 +1,22 @@
+# isbn_extractor
+
+Usage: isbn_extract [-v] -t type -n pages [-l lang] [-f] file
+
+isbn_extractor's purpose is obvious.
+It is OCR powered and consumes resources a lot.
+
+Dependencies
+------------
+This program was originally developed against
+* tesseract v4.0.0
+* djvulibre v3.5.27
+* libmupdf v1.14.0
+
+For some distro specific reason, libmupdf is linked statically.
+
+TODO
+----
+* check for embedded text in PDF/DJVU
+* reduce memory usage (now: page_count * page_size)
+* add more formats (PS, DVI, ...)
+* use different OCR engine?
