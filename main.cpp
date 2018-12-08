@@ -148,6 +148,8 @@ int main(int argc, char* argv[])
 		retcode = EXIT_FAILURE;
 		std::exit(retcode);
 	}
+	/* make Tesseract quiet */
+	api->SetVariable("debug_file", "/dev/null");
 
 	std::vector<image_t> images = extract_images(file, page_count);
 	if(images.size() != page_count)
