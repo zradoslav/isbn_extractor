@@ -7,10 +7,14 @@
 
 #include <tesseract/baseapi.h>
 
-static tesseract::TessBaseAPI* api;
+using ocr_api = tesseract::TessBaseAPI;
+using image_fn = std::vector<image_t> (*)(const char*, int);
+
+extern std::vector<image_t> extract_images_djv(const char* file, int page_count);
+extern std::vector<image_t> extract_images_pdf(const char* file, int page_count);
 
 // later i'll add per-format embedded text extraction (if any)
-static std::string extract_text_ocr(const image_t& image)
+static std::string extract_text_ocr(const image_t& image, ocr_api* api)
 {
 	api->SetImage(image.data, image.width, image.height,
 	              image.bytes_per_pixel, image.bytes_per_line);
@@ -63,8 +67,6 @@ static void help()
 
 int main(int argc, char* argv[])
 {
-	int retcode = EXIT_SUCCESS;
-
 	const char* type = nullptr;
 	const char* file = nullptr;
 	const char* lang = "eng";
@@ -96,19 +98,16 @@ int main(int argc, char* argv[])
 		case 'h':
 			printf("Usage: %s [-v] -t type -n pages [-l lang] [-f] file\n", argv[0]);
 			help();
-			retcode = EXIT_SUCCESS;
-			std::exit(retcode);
+			exit(EXIT_SUCCESS);
 		default:
 			printf("Usage: %s [-v] -t type -n pages [-l lang] [-f] file\n", argv[0]);
-			retcode = EXIT_FAILURE;
-			std::exit(retcode);
+			exit(EXIT_FAILURE);
 		}
 	}
 	if(!type || !page_count)
 	{
 		fprintf(stderr, "Invalid arguments\n");
-		retcode = EXIT_FAILURE;
-		std::exit(retcode);
+		exit(EXIT_FAILURE);
 	}
 	if(!file)
 	{
@@ -117,8 +116,7 @@ int main(int argc, char* argv[])
 		else
 		{
 			fprintf(stderr, "No file passed\n");
-			retcode = EXIT_FAILURE;
-			std::exit(retcode);
+			exit(EXIT_FAILURE);
 		}
 	}
 
@@ -130,54 +128,37 @@ int main(int argc, char* argv[])
 	else
 	{
 		fprintf(stderr, "Unsupported filetype\n");
-		retcode = EXIT_FAILURE;
-		std::exit(retcode);
+		exit(EXIT_FAILURE);
 	}
 
 	/* initialize OCR */
-	api = new tesseract::TessBaseAPI();
-	if(!api)
-	{
-		retcode = EXIT_FAILURE;
-		std::exit(retcode);
-	}
-	if(api->Init(nullptr, lang))
+	ocr_api tesseract;
+	if(tesseract.Init(nullptr, lang))
 	{
 		fprintf(stderr, "OCR engine init failure\n");
-		api->End();
-		retcode = EXIT_FAILURE;
-		std::exit(retcode);
+		exit(EXIT_FAILURE);
 	}
 	/* make Tesseract quiet */
-	api->SetVariable("debug_file", "/dev/null");
+	tesseract.SetVariable("debug_file", "/dev/null");
 
 	std::vector<image_t> images = extract_images(file, page_count);
 	if(images.size() != page_count)
 	{
 		perror("Failed processing file");
-		retcode = EXIT_FAILURE;
-		goto clean_mem;
+		exit(EXIT_FAILURE);
 	}
 
 	for(int i = 0; i < page_count; i++)
 	{
 		if(verbose)
 			printf("page[%d]: %dx%d, %d kB\n", i, images[i].width, images[i].height,
-			       images[i].bytes_per_pixel * images[i].width * images[i].height / 1024);
+			       images[i].bytes_per_line * images[i].height / 1024);
 
-		std::string ocr_text = extract_text_ocr(images[i]);
+		std::string ocr_text = extract_text_ocr(images[i], &tesseract);
 
 		for(auto& m : match_isbn(ocr_text))
 			std::cout << "ISBN: " << m << std::endl;
 	}
 
-clean_mem:
-	for(auto& image : images)
-		if(image.data)
-			delete[] image.data;
-
-	api->End();
-	delete api;
-
-	exit(retcode);
+	exit(EXIT_SUCCESS);
 }

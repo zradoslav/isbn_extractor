@@ -1,5 +1,6 @@
 #include "image.h"
 
+#include <vector>
 #include <cstring>
 
 #include <mupdf/fitz.h>
@@ -36,16 +37,13 @@ std::vector<image_t> extract_images_pdf(const char* file, int page_count)
 		if(!pix)
 			break;
 
-		image_t img =
-		{
-			fz_pixmap_width(ctx, pix),
-			fz_pixmap_height(ctx, pix),
-			pix->n,
-			fz_pixmap_stride(ctx, pix),
-			nullptr
-		};
+		image_t img(fz_pixmap_width(ctx, pix),
+		            fz_pixmap_height(ctx, pix),
+		            pix->n,
+		            fz_pixmap_stride(ctx, pix),
+		            nullptr);
 
-		size_t ibuff_size = img.width * img.height * img.bytes_per_pixel;
+		size_t ibuff_size = img.bytes_per_line * img.height;
 		img.data = new unsigned char[ibuff_size];
 		memcpy(img.data, fz_pixmap_samples(ctx, pix), ibuff_size);
 

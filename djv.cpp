@@ -1,5 +1,7 @@
 #include "image.h"
 
+#include <vector>
+
 #include <libdjvu/ddjvuapi.h>
 
 std::vector<image_t> extract_images_djv(const char* file, int page_count)
@@ -64,14 +66,11 @@ std::vector<image_t> extract_images_djv(const char* file, int page_count)
 			break;
 		}
 
-		image_t img =
-		{
-			rect.w,
-			rect.h,
-			(type == DDJVU_PAGETYPE_BITONAL) ? 1 : 3,
-			stride,
-			buffer
-		};
+		image_t img(rect.w,
+		            rect.h,
+		            (type == DDJVU_PAGETYPE_BITONAL) ? 1 : 3,
+		            stride,
+		            buffer);
 
 		ddjvu_page_release(page);
 		ddjvu_format_release(format);
