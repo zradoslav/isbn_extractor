@@ -8,13 +8,13 @@
 #include <tesseract/capi.h>
 
 #define isbn_max_num 4
-static const char* isbn_rx_str = "isbn[- \\t]*?(1[03])?[: \\t]*([- \\d\\t]+[x\\d])";
+static const char* isbn_rx_str = "isbn[- \\t\\(]*?(1[03])?[\\): \\t]*([- \\d\\t]+[x\\d])";
 static regex_t isbn_rx;
 
 static TessBaseAPI* api;
 
 // later i'll add per-format embedded text extraction (if any)
-static char* extract_text_ocr(const image_t image, int* tbuff_size)
+static char* extract_text_ocr(const image_t image, size_t* tbuff_size)
 {
 	TessBaseAPISetImage(api, image.data, image.width, image.height, image.bytes_per_pixel, image.bytes_per_line);
 	if(TessBaseAPIRecognize(api, NULL))
@@ -91,8 +91,8 @@ int main(int argc, char* argv[])
 {
 	int retcode = EXIT_SUCCESS;
 
-	const char* type = 0;
-	const char* file = 0;
+	const char* type = NULL;
+	const char* file = NULL;
 	const char* lang = "eng";
 	int page_count = 0;
 	bool verbose = false;
@@ -168,6 +168,8 @@ int main(int argc, char* argv[])
 		retcode = EXIT_FAILURE;
 		goto clean_ocr;
 	}
+	/* make Tesseract quiet */
+	TessBaseAPISetVariable(api, "debug_file", "/dev/null");
 
 	image_t* images = calloc(page_count, sizeof(image_t));
 	if(!images)
@@ -186,12 +188,12 @@ int main(int argc, char* argv[])
 	regcomp(&isbn_rx, isbn_rx_str, REG_ICASE);
 	for(int i = 0; i < page_count; i++)
 	{
-		if(verbose)
-			printf("page[%d]: %dx%d, %d kB\n", i, images[i].width, images[i].height,
-			       images[i].bytes_per_pixel * images[i].width * images[i].height / 1024);
-
-		int ocr_len = 0;
+		size_t ocr_len = 0;
 		char* ocr_text = extract_text_ocr(images[i], &ocr_len);
+
+		if(verbose)
+			printf("page[%d]: %dx%d, %d kB, %zu B\n", i, images[i].width, images[i].height,
+			       images[i].bytes_per_line * images[i].height / 1024, ocr_len);
 
 		char* matches[isbn_max_num] = { 0 };
 		match_isbn(ocr_text, matches, isbn_max_num);
