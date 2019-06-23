@@ -13,6 +13,11 @@ static regex_t isbn_rx;
 
 static TessBaseAPI* api;
 
+typedef int (*extract_images_fn)(const char*, int, image_t*);
+
+extern int extract_images_djv(const char* file, int page_count, image_t* ibuff);
+extern int extract_images_pdf(const char* file, int page_count, image_t* ibuff);
+
 // later i'll add per-format embedded text extraction (if any)
 static char* extract_text_ocr(const image_t image, size_t* tbuff_size)
 {
@@ -148,11 +153,11 @@ int main(int argc, char* argv[])
 		}
 	}
 
-	extract_func process = NULL;
+	extract_images_fn extract_images = NULL;
 	if(!strcasecmp(type, "djv") || !strcasecmp(type, "djvu"))
-		process = &extract_images_djv;
+		extract_images = &extract_images_djv;
 	else if(!strcasecmp(type, "pdf"))
-		process = &extract_images_pdf;
+		extract_images = &extract_images_pdf;
 	else
 	{
 		fprintf(stderr, "Unsupported filetype\n");
@@ -178,7 +183,7 @@ int main(int argc, char* argv[])
 		retcode = EXIT_FAILURE;
 		goto clean_ocr;
 	}
-	if(process(file, page_count, images) != page_count)
+	if(extract_images(file, page_count, images) != page_count)
 	{
 		perror("Failed processing file");
 		retcode = EXIT_FAILURE;
