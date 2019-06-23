@@ -25,10 +25,6 @@ int extract_images_djv(const char* file, int page_count, image_t* ibuff)
 		return -3;
 	}
 
-	static unsigned int masks[4] = { 0xff0000, 0xff00, 0xff, 0xff000000 };
-	ddjvu_format_t* format = ddjvu_format_create(DDJVU_FORMAT_RGBMASK32, 4, masks);
-	ddjvu_format_set_row_order(format, 1);
-
 	int page_read = 0;
 	while(page_read != page_count)
 	{
@@ -43,11 +39,21 @@ int extract_images_djv(const char* file, int page_count, image_t* ibuff)
 		rect.w = ddjvu_page_get_width(page);
 		rect.h = ddjvu_page_get_height(page);
 
-		/*
+		unsigned int stride;
+		ddjvu_format_t* format = NULL;
 		ddjvu_page_type_t type = ddjvu_page_get_type(page);
-		int stride = (type == DDJVU_PAGETYPE_BITONAL) ? (rect.w + 7)/8 : rect.w*3;
-		*/
-		unsigned int stride = rect.w * 4;
+		if(type == DDJVU_PAGETYPE_BITONAL)
+		{
+			format = ddjvu_format_create(DDJVU_FORMAT_GREY8, 0, NULL);
+			stride = rect.w;
+		}
+		else
+		{
+			unsigned int masks[4] = { 0xff0000, 0xff00, 0xff, 0xff000000 };
+			format = ddjvu_format_create(DDJVU_FORMAT_RGBMASK32, 4, masks);
+			stride = rect.w * 4;
+		}
+		ddjvu_format_set_row_order(format, 1);
 
 		unsigned char* buffer = malloc(stride * rect.h);
 		if(!ddjvu_page_render(page, DDJVU_RENDER_COLOR, &rect, &rect, format, stride, (char*)buffer))
@@ -63,10 +69,11 @@ int extract_images_djv(const char* file, int page_count, image_t* ibuff)
 		ibuff[page_read].bytes_per_line = stride;
 
 		ddjvu_page_release(page);
+		ddjvu_format_release(format);
+
 		page_read++;
 	}
 
-	ddjvu_format_release(format);
 	ddjvu_document_release(doc);
 	ddjvu_context_release(ctx);
 
