@@ -23,7 +23,7 @@ static std::string extract_text_ocr(const image_t& image, ocr_api* api)
 
 static std::vector<std::string> match_isbn(std::string text)
 {
-	static std::regex isbn_regex("isbn[- \\t]*?(1[03])?[: \\t]*([- \\d\\t]+[x\\d])",
+	static std::regex isbn_regex("isbn[- \\t\\(]*?(1[03])?[\\): \\t]*([- \\d\\t]+[x\\d])",
 	                             std::regex::ECMAScript | std::regex::icase);
 	std::smatch match;
 
@@ -31,8 +31,9 @@ static std::vector<std::string> match_isbn(std::string text)
 	while(std::regex_search(text, match, isbn_regex))
 	{
 		std::string isbn = match[2].str();
-		/* remove all dashes */
+		/* remove all dashes & spaces */
 		isbn.erase(std::remove(isbn.begin(), isbn.end(), '-'), isbn.end());
+		isbn.erase(std::remove(isbn.begin(), isbn.end(), ' '), isbn.end());
 		isbn_matches.push_back(isbn);
 
 		text = match.suffix();
@@ -150,14 +151,14 @@ int main(int argc, char* argv[])
 
 	for(int i = 0; i < page_count; i++)
 	{
-		if(verbose)
-			printf("page[%d]: %dx%d, %d kB\n", i, images[i].width, images[i].height,
-			       images[i].bytes_per_line * images[i].height / 1024);
-
 		std::string ocr_text = extract_text_ocr(images[i], &tesseract);
 
+		if(verbose)
+			printf("page[%d]: %dx%d, %d kB, %zu B\n", i, images[i].width, images[i].height,
+			       images[i].bytes_per_line * images[i].height / 1024, ocr_text.size());
+
 		for(auto& m : match_isbn(ocr_text))
-			std::cout << "ISBN: " << m << std::endl;
+			std::cout << m << std::endl;
 	}
 
 	exit(EXIT_SUCCESS);
