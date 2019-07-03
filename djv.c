@@ -65,7 +65,7 @@ int extract_images_djv(const char* file, int page_count, image_t* ibuff)
 		ibuff[page_read].data = buffer;
 		ibuff[page_read].width = rect.w;
 		ibuff[page_read].height = rect.h;
-		ibuff[page_read].bytes_per_pixel = 3;
+		ibuff[page_read].bytes_per_pixel = (type == DDJVU_PAGETYPE_BITONAL) ? 1 : 3;
 		ibuff[page_read].bytes_per_line = stride;
 
 		ddjvu_page_release(page);
