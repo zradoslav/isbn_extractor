@@ -41,7 +41,7 @@ int extract_images_pdf(const char* file, int page_count, image_t* ibuff)
 		ibuff[page_read].bytes_per_pixel = pix->n;
 		ibuff[page_read].bytes_per_line = fz_pixmap_stride(ctx, pix);
 
-		size_t ibuff_size = ibuff[page_read].width * ibuff[page_read].height * ibuff[page_read].bytes_per_pixel;
+		size_t ibuff_size = ibuff[page_read].height * ibuff[page_read].bytes_per_line;
 		ibuff[page_read].data = malloc(ibuff_size);
 		memcpy(ibuff[page_read].data, fz_pixmap_samples(ctx, pix), ibuff_size);
 
